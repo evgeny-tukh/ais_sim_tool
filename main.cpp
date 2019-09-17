@@ -1,10 +1,13 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
+#include <ctype.h>
 #include <time.h> 
 #include <ctype.h>
 #include <windows.h>
 #include <corecrt_wtime.h>
 #include "target.h"
+#include "config.h"
 
 #include "nmea_utils.h"
 #include "ais_utils.h"
@@ -13,8 +16,6 @@
 #define ASCII_XOFF      0x13
 
 #define CONSOLE_PORT    0
-
-enum SimMode { Arpa, Ais };
 
 typedef void (*TargetOutCb) (const Target *, HANDLE);
 
@@ -275,11 +276,25 @@ int main (int argCount, char *args [])
     double  lon          = 29;
     SimMode mode         = SimMode::Arpa;
     HANDLE  portHandle   = INVALID_HANDLE_VALUE;
+    Config  cfg;
+
+    cfg.lat          = & lat;
+    cfg.lon          = & lon;
+    cfg.numOfTargets = & numOfTargets;
+    cfg.numOfSAR     = & numOfSAR;
+    cfg.maxRange     = & maxRange;
+    cfg.maxSpeed     = & maxSpeed;
+    cfg.port         = & port;
+    cfg.baud         = & baud;
+    cfg.countryCode  = & countryCode;
+    cfg.simMode      = & mode;
+    cfg.consoleMode  = & consoleMode;
+    cfg.params       = params;
 
     srand  (time (0));
 
     printf ("ARPA target simulator v1.0\n");
-
+ 
     for (int i = 1; i < argCount; ++ i)
     {
         char *arg = args [i];
@@ -300,6 +315,9 @@ int main (int argCount, char *args [])
         {
             switch (toupper (arg [1]))
             {
+                case 'G':
+                    loadConfig (arg + 3, cfg); break;
+
                 case 'Y':
                     countryCode = atoi (arg + 3); break;
 

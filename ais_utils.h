@@ -1,7 +1,7 @@
 #pragma once
 
-#include <math.h>
-#include <ctype.h>
+byte calcCRC (char *);
+
 #include "sim_types.h"
 #include "target.h"
 
@@ -10,8 +10,6 @@
 #define _111000B_           0x38
 #define _100000B_           0x20
 #define _10000000B_         0x80
-
-byte calcCRC (char *);
 
 namespace AIS
 {
