@@ -371,8 +371,8 @@ int main (int argCount, char *args [])
 
     printf ("\n\nSetting:\n\n\tNumber of targets:\t%d\n\tMaximal range, m:\t%d\n"
             "\tLatitude:\t\t%.6f\n\tLongitude:\t\t%.6f\n"
-            "\tPort:\t\t\tCOM%d\n\tBaud:\t\t\t%d\n\tParams:\t\t\t%s\n",
-            numOfTargets, maxRange, lat, lon, port, baud, params);
+            "\tPort:\t\t\tCOM%d\n\tBaud:\t\t\t%d\n\tParams:\t\t\t%s\n\tConsole:\t\t%s\n",
+            numOfTargets, maxRange, lat, lon, port, baud, params, consoleMode ? "yes" : "no");
 
     portHandle = consoleMode ? CONSOLE_PORT : openPort (port, baud, params);
 

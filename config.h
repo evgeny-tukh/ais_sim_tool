@@ -15,7 +15,7 @@ struct Config
 
 bool atob (const char *value)
 {
-    return stricmp (value, "true") == 0 || stricmp (value, "yes") || atoi (value) != 0;
+    return stricmp (value, "true") == 0 || stricmp (value, "yes") == 0 || atoi (value) != 0;
 }
 
 bool isWhiteSpace (const char chr)
