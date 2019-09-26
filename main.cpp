@@ -70,7 +70,7 @@ Target *initializeTargets (const int numOfTargets, const int numOfSAR, const dou
 }
 
 void simulation (Target *targets, const int numOfTargets, const double shipLat, const double shipLon, TargetOutCb cb,
-                 HANDLE portHandle)
+                 HANDLE portHandle, const bool shuttleMode, const double maxRange)
 {
     time_t lastCalcTime = time (0);
 
@@ -96,6 +96,14 @@ void simulation (Target *targets, const int numOfTargets, const double shipLat, 
                 target->lon   = newLon;
 
                 cb (target, portHandle);
+
+                if (shuttleMode && (target->range >= maxRange))
+                {
+                    target->cog += 180.0;
+
+                    if (target->cog >= 360.0)
+                        target->cog -= 360.0;
+                }
             }
 
             lastCalcTime = now;
@@ -271,6 +279,7 @@ int main (int argCount, char *args [])
     int     baud         = 4800;
     int     countryCode  = 219; // Denmark
     bool    consoleMode  = true;
+    bool    shuttleMode  = false;
     char    params [4]   = { "8N1" };
     double  lat          = 59;
     double  lon          = 29;
@@ -290,6 +299,7 @@ int main (int argCount, char *args [])
     cfg.simMode      = & mode;
     cfg.consoleMode  = & consoleMode;
     cfg.params       = params;
+    cfg.shuttleMode  = & shuttleMode;
 
     srand  (time (0));
 
@@ -309,6 +319,9 @@ int main (int argCount, char *args [])
 
             case 'C':
                 consoleMode = true; continue;
+
+            case 'U':
+                shuttleMode = true; continue;
         }
 
         if (arg [2] == ':')
@@ -371,15 +384,15 @@ int main (int argCount, char *args [])
 
     printf ("\n\nSetting:\n\n\tNumber of targets:\t%d\n\tMaximal range, m:\t%d\n"
             "\tLatitude:\t\t%.6f\n\tLongitude:\t\t%.6f\n"
-            "\tPort:\t\t\tCOM%d\n\tBaud:\t\t\t%d\n\tParams:\t\t\t%s\n\tConsole:\t\t%s\n",
-            numOfTargets, maxRange, lat, lon, port, baud, params, consoleMode ? "yes" : "no");
+            "\tPort:\t\t\tCOM%d\n\tBaud:\t\t\t%d\n\tParams:\t\t\t%s\n\tConsole:\t\t%s\n\tShuttle mode:\t\t%s\n",
+            numOfTargets, maxRange, lat, lon, port, baud, params, consoleMode ? "yes" : "no", shuttleMode ? "yes" : "no");
 
     portHandle = consoleMode ? CONSOLE_PORT : openPort (port, baud, params);
 
     if (mode == SimMode::Arpa)
-        simulation (targets, numOfTargets, lat, lon, sendOutArpaTarget, portHandle);
+        simulation (targets, numOfTargets, lat, lon, sendOutArpaTarget, portHandle, shuttleMode, (double) maxRange);
     else
-        simulation (targets, numOfTargets, lat, lon, sendOutAisTarget, portHandle);
+        simulation (targets, numOfTargets, lat, lon, sendOutAisTarget, portHandle, shuttleMode, (double) maxRange);
 
     if (portHandle != CONSOLE_PORT && portHandle != INVALID_HANDLE_VALUE)
         CloseHandle (portHandle);

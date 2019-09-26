@@ -9,7 +9,7 @@ struct Config
     double  *lat, *lon;
     int     *numOfTargets, *numOfSAR, *maxRange, *maxSpeed, *port, *baud, *countryCode;
     SimMode *simMode;
-    bool    *consoleMode;
+    bool    *consoleMode, *shuttleMode;
     char    *params;
 };
 
@@ -88,6 +88,8 @@ void processLine (const char *line, Config& cfg)
             getSimulationMode (value, cfg.simMode);
         else if (stricmp (key, "consoleMode") == 0)
             *(cfg.consoleMode) = atob (value);
+        else if (stricmp (key, "shuttleMode") == 0)
+            *(cfg.shuttleMode) = atob (value);
         else if (stricmp (key, "params") == 0)
             memcpy (cfg.params, value, sizeof (cfg.params));
     }
