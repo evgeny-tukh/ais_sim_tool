@@ -19,6 +19,14 @@
 
 typedef void (*TargetOutCb) (const Target *, HANDLE);
 
+struct SimulationParams
+{
+    int    numOfTargets;
+    double shipLat, shipLon, maxRange, radarCursorRng, radarCursorBrg;
+    HANDLE portHandle;
+    bool   shuttleMode, sendRadarCursor;
+};
+
 unsigned char calcCRC (char *sentence)
 {
     unsigned char result = 0;
@@ -70,10 +78,18 @@ Target *initializeTargets (const int numOfTargets, const int numOfSAR, const int
     return targets;
 }
 
-void simulation (Target *targets, const int numOfTargets, const double shipLat, const double shipLon, TargetOutCb cb,
-                 HANDLE portHandle, const bool shuttleMode, const double maxRange)
+void simulation (Target *targets, SimulationParams& params, TargetOutCb cb)
 {
-    time_t lastCalcTime = time (0);
+    const int numOfTargets      = params.numOfTargets;
+    const double shipLat        = params.shipLat;
+    const double shipLon        = params.shipLon;
+    HANDLE portHandle           = params.portHandle;
+    const bool shuttleMode      = params.shuttleMode;
+    const bool sendRadarCursor  = params.shuttleMode;
+    const double maxRange       = params.maxRange;
+    const double radarCursorBrg = params.radarCursorBrg;
+    const double radarCursorRng = params.radarCursorRng;
+    time_t lastCalcTime         = time (0);
 
     while (true)
     {
@@ -421,15 +437,28 @@ int main (int argCount, char *args [])
             numOfTargets, numOfSAR, numOfMOB, maxRange, lat, lon, port, baud, params, consoleMode ? "yes" : "no",
             shuttleMode ? "yes" : "no", sendRadarCursor ? "yes" : "no");
 
+
     if (sendRadarCursor)
         printf ("\tRadar cursor brg:\t%d\n\tRadar cursor rng:\t%d\n", radarCursorBrg, radarCursorRng);
 
     portHandle = consoleMode ? CONSOLE_PORT : openPort (port, baud, params);
 
+    SimulationParams simParams;
+
+    simParams.numOfTargets    = numOfTargets;
+    simParams.shipLat         = lat;
+    simParams.shipLon         = lon;
+    simParams.portHandle      = portHandle;
+    simParams.shuttleMode     = shuttleMode;
+    simParams.maxRange        = (double) maxRange;
+    simParams.radarCursorBrg  = radarCursorBrg;
+    simParams.radarCursorRng  = radarCursorRng;
+    simParams.sendRadarCursor = sendRadarCursor;
+
     if (mode == SimMode::Arpa)
-        simulation (targets, numOfTargets, lat, lon, sendOutArpaTarget, portHandle, shuttleMode, (double) maxRange);
+        simulation (targets, simParams, sendOutArpaTarget);
     else
-        simulation (targets, numOfTargets, lat, lon, sendOutAisTarget, portHandle, shuttleMode, (double) maxRange);
+        simulation (targets, simParams, sendOutAisTarget);
 
     if (portHandle != CONSOLE_PORT && portHandle != INVALID_HANDLE_VALUE)
         CloseHandle (portHandle);
