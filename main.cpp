@@ -44,8 +44,8 @@ int getRandValue (const int maxValue)
     return (int) getRandValue ((double) maxValue);
 }
 
-Target *initializeTargets (const int numOfTargets, const int numOfSAR, const double lat, const double lon, const double maxRange,
-                           const double maxSpeed)
+Target *initializeTargets (const int numOfTargets, const int numOfSAR, const int numOfMOB, const double lat, const double lon,
+                           const double maxRange, const double maxSpeed)
 {
     Target *targets = (Target *) malloc (sizeof (Target) * numOfTargets);
 
@@ -55,7 +55,8 @@ Target *initializeTargets (const int numOfTargets, const int numOfSAR, const dou
 
         sprintf (target->name, "SHIP%02d", i + 1);
 
-        target->sar   = i >= (numOfTargets - numOfSAR);        
+        target->sar   = i >= (numOfTargets - numOfSAR - numOfMOB) && i < (numOfTargets - numOfMOB);
+        target->mob   = i >= (numOfTargets - numOfMOB);
         target->id    = i + 1;
         target->brg   = getRandValue (360.0);
         target->cog   = getRandValue (360.0);
@@ -142,20 +143,32 @@ void sendOutAisTarget (const Target *target, HANDLE portHandle)
 
     memset (data, 0, sizeof (data));
 
-    if (target->sar)
-        AIS::buildSafeAndResqueReport (buffer, (Target *) target);
-    else
+    if (target->mob)
+    {
+        //AIS::buildBroadcastSRM (buffer, (Target *) target);
         AIS::buildPositionReport (buffer, (Target *) target);
-        
+    }
+    else if (target->sar)
+    {
+        AIS::buildSafeAndResqueReport (buffer, (Target *) target);
+    }
+    else
+    {
+        AIS::buildPositionReport (buffer, (Target *) target);
+    }
+
     AIS::encodeString (buffer, data, 28);
     AIS::buildVDM (data, sentences, 28);
 
     memset (data, 0, sizeof (data));
     
-    AIS::buildStaticShipAndVoyageData (buffer, (Target *) target);
-    AIS::encodeString (buffer, data, 71);
-    AIS::buildVDM (data, sentences, 71, 4);
-
+    if (!target->mob)
+    {
+        AIS::buildStaticShipAndVoyageData (buffer, (Target *) target);
+        AIS::encodeString (buffer, data, 71);
+        AIS::buildVDM (data, sentences, 71, 4);
+    }
+    
     for (auto& sentence : sentences)
     {
         const char *output = sentence.c_str ();
@@ -258,6 +271,7 @@ void showHelp ()
     printf ("sim [options] where options are:\n\n"
             "\t-y:imoCountryCode\n"
             "\t-n:numberOfTargets\n"
+            "\t-o:numberOfManOverBoardUnits\n"
             "\t-f:numberOfSafeAndResqueTargets (included into -n)\n"
             "\t-c[onsoleMode]\n"
             "\t-p:serialPort\n"
@@ -271,35 +285,43 @@ void showHelp ()
 int main (int argCount, char *args [])
 {
     Target *targets;
-    int     numOfTargets = 5;
-    int     numOfSAR     = 0;
-    int     maxRange     = 500;
-    int     maxSpeed     = 12;
-    int     port         = 1;
-    int     baud         = 4800;
-    int     countryCode  = 219; // Denmark
-    bool    consoleMode  = true;
-    bool    shuttleMode  = false;
-    char    params [4]   = { "8N1" };
-    double  lat          = 59;
-    double  lon          = 29;
-    SimMode mode         = SimMode::Arpa;
-    HANDLE  portHandle   = INVALID_HANDLE_VALUE;
+    int     numOfTargets    = 5;
+    int     numOfSAR        = 0;
+    int     numOfMOB        = 0;
+    int     maxRange        = 500;
+    int     maxSpeed        = 12;
+    int     port            = 1;
+    int     baud            = 4800;
+    int     countryCode     = 219; // Denmark
+    int     radarCursorBrg  = 45;
+    int     radarCursorRng  = 200;
+    bool    consoleMode     = true;
+    bool    shuttleMode     = false;
+    bool    sendRadarCursor = false;
+    char    params [4]      = { "8N1" };
+    double  lat             = 59;
+    double  lon             = 29;
+    SimMode mode            = SimMode::Arpa;
+    HANDLE  portHandle      = INVALID_HANDLE_VALUE;
     Config  cfg;
 
-    cfg.lat          = & lat;
-    cfg.lon          = & lon;
-    cfg.numOfTargets = & numOfTargets;
-    cfg.numOfSAR     = & numOfSAR;
-    cfg.maxRange     = & maxRange;
-    cfg.maxSpeed     = & maxSpeed;
-    cfg.port         = & port;
-    cfg.baud         = & baud;
-    cfg.countryCode  = & countryCode;
-    cfg.simMode      = & mode;
-    cfg.consoleMode  = & consoleMode;
-    cfg.params       = params;
-    cfg.shuttleMode  = & shuttleMode;
+    cfg.lat             = & lat;
+    cfg.lon             = & lon;
+    cfg.numOfTargets    = & numOfTargets;
+    cfg.numOfSAR        = & numOfSAR;
+    cfg.numOfMOB        = & numOfMOB;
+    cfg.maxRange        = & maxRange;
+    cfg.maxSpeed        = & maxSpeed;
+    cfg.port            = & port;
+    cfg.baud            = & baud;
+    cfg.countryCode     = & countryCode;
+    cfg.simMode         = & mode;
+    cfg.consoleMode     = & consoleMode;
+    cfg.params          = params;
+    cfg.shuttleMode     = & shuttleMode;
+    cfg.sendRadarCursor = & sendRadarCursor;
+    cfg.radarCursorBrg  = & radarCursorBrg;
+    cfg.radarCursorRng  = & radarCursorRng;
 
     srand  (time (0));
 
@@ -337,6 +359,9 @@ int main (int argCount, char *args [])
                 case 'F':
                     numOfSAR = atoi (arg + 3); break;
 
+                case 'O':
+                    numOfMOB = atoi (arg + 3); break;
+
                 case 'P':
                     consoleMode = false;
                     port        = atoi (arg + 3);
@@ -373,19 +398,31 @@ int main (int argCount, char *args [])
         }
     }
 
-    targets = initializeTargets (numOfTargets, numOfSAR, lat, lon, (double) maxRange, (double) maxSpeed);
+    targets = initializeTargets (numOfTargets, numOfSAR, numOfMOB, lat, lon, (double) maxRange, (double) maxSpeed);
 
     if (mode == SimMode::Ais)
     {
         // Generate MMSIs
         for (int i = 0; i < numOfTargets; ++ i)
-            targets [i].id += countryCode * 1e6;
+        {
+            if (targets [i].mob)
+                targets [i].id += 972000000;
+            else if (targets [i].sar)
+                targets [i].id += 970000000;
+            else
+                targets [i].id += countryCode * 1e6;
+        }
     }
 
-    printf ("\n\nSetting:\n\n\tNumber of targets:\t%d\n\tMaximal range, m:\t%d\n"
+    printf ("\n\nSetting:\n\n\tNumber of targets:\t%d\n\tNumber of SARs:\t%d\n\tNumber of MOBs:\t%d\n\tMaximal range, m:\t%d\n"
             "\tLatitude:\t\t%.6f\n\tLongitude:\t\t%.6f\n"
-            "\tPort:\t\t\tCOM%d\n\tBaud:\t\t\t%d\n\tParams:\t\t\t%s\n\tConsole:\t\t%s\n\tShuttle mode:\t\t%s\n",
-            numOfTargets, maxRange, lat, lon, port, baud, params, consoleMode ? "yes" : "no", shuttleMode ? "yes" : "no");
+            "\tPort:\t\t\tCOM%d\n\tBaud:\t\t\t%d\n\tParams:\t\t\t%s\n\tConsole:\t\t%s\n\tShuttle mode:\t\t%s\n"
+            "\tSend RCur:\t\t%s\n",
+            numOfTargets, numOfSAR, numOfMOB, maxRange, lat, lon, port, baud, params, consoleMode ? "yes" : "no",
+            shuttleMode ? "yes" : "no", sendRadarCursor ? "yes" : "no");
+
+    if (sendRadarCursor)
+        printf ("\tRadar cursor brg:\t%d\n\tRadar cursor rng:\t%d\n", radarCursorBrg, radarCursorRng);
 
     portHandle = consoleMode ? CONSOLE_PORT : openPort (port, baud, params);
 

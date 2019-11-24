@@ -7,9 +7,9 @@
 struct Config
 {
     double  *lat, *lon;
-    int     *numOfTargets, *numOfSAR, *maxRange, *maxSpeed, *port, *baud, *countryCode;
+    int     *numOfTargets, *numOfSAR, *numOfMOB, *maxRange, *maxSpeed, *port, *baud, *countryCode, *radarCursorBrg, *radarCursorRng;
     SimMode *simMode;
-    bool    *consoleMode, *shuttleMode;
+    bool    *consoleMode, *shuttleMode, *sendRadarCursor;
     char    *params;
 };
 
@@ -74,6 +74,8 @@ void processLine (const char *line, Config& cfg)
             *(cfg.numOfTargets) = atoi (value);
         else if (stricmp (key, "numOfSAR") == 0)
             *(cfg.numOfSAR) = atoi (value);
+        else if (stricmp (key, "numOfMOB") == 0)
+            *(cfg.numOfMOB) = atoi (value);
         else if (stricmp (key, "maxRange") == 0)
             *(cfg.maxRange) = atoi (value);
         else if (stricmp (key, "maxSpeed") == 0)
@@ -92,6 +94,12 @@ void processLine (const char *line, Config& cfg)
             *(cfg.shuttleMode) = atob (value);
         else if (stricmp (key, "params") == 0)
             memcpy (cfg.params, value, sizeof (cfg.params));
+        else if (stricmp (key, "sendRadarCursor") == 0)
+            *(cfg.sendRadarCursor) = atob (value);
+        else if (stricmp (key, "radarCursorBrg") == 0)
+            *(cfg.radarCursorBrg) = atoi (value);
+        else if (stricmp (key, "radarCursorRng") == 0)
+            *(cfg.radarCursorRng) = atoi (value);
     }
 }
 

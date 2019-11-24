@@ -16,6 +16,7 @@ namespace AIS
     byte *buildStaticShipAndVoyageData (byte *buffer, Target *target, const int retransmitCount = 0);
     byte *buildPositionReport (byte *buffer, Target *target, const int retransmitCount = 0);
     byte *buildSafeAndResqueReport (byte *buffer, Target *target, const int retransmitCount = 0);
+    byte *buildBroadcastSRM (byte *buffer, Target *target, const int retransmitCount = 0);
 
     inline word swapBytes (const word data)
     {
@@ -244,6 +245,19 @@ byte *AIS::buildStaticShipAndVoyageData (byte *buffer, Target *target, const int
     smartEncodeAndStore (buffer, count, "@@@@@@@@@@@@@@@@@@@@", 20);
     smartEncodeAndStore (buffer, count, (byte) 0, 1);
     smartEncodeAndStore (buffer, count, (byte) 0, 1);
+
+    return buffer;
+}
+
+byte *AIS::buildBroadcastSRM (byte *buffer, Target *target, const int retransmitCount)
+{
+    int count = 0;
+
+    smartEncodeAndStore (buffer, count, (byte) 14, 6);
+    smartEncodeAndStore (buffer, count, (byte) retransmitCount, 2);
+    smartEncodeAndStore (buffer, count, (dword) target->id, 30);
+    smartEncodeAndStore (buffer, count, (byte) 0, 2);
+    smartEncodeAndStore (buffer, count, "ACTIVE SART", 11);
 
     return buffer;
 }
