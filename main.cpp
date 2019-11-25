@@ -18,6 +18,7 @@
 #define CONSOLE_PORT    0
 
 typedef void (*TargetOutCb) (const Target *, HANDLE);
+typedef void (*RadarCursorCb) (const double bearing, const double range, HANDLE);
 
 struct SimulationParams
 {
@@ -78,7 +79,7 @@ Target *initializeTargets (const int numOfTargets, const int numOfSAR, const int
     return targets;
 }
 
-void simulation (Target *targets, SimulationParams& params, TargetOutCb cb)
+void simulation (Target *targets, SimulationParams& params, TargetOutCb cbTarget, RadarCursorCb cbRadarCursor)
 {
     const int numOfTargets      = params.numOfTargets;
     const double shipLat        = params.shipLat;
@@ -98,6 +99,9 @@ void simulation (Target *targets, SimulationParams& params, TargetOutCb cb)
 
         if (timeSinceLastCalc > 0)
         {
+            if (sendRadarCursor)
+                cbRadarCursor (radarCursorBrg, radarCursorRng, portHandle);
+
             for (int i = 0; i < numOfTargets; ++ i)
             {
                 Target *target = (Target *) targets + i;
@@ -112,7 +116,7 @@ void simulation (Target *targets, SimulationParams& params, TargetOutCb cb)
                 target->lat   = newLat;
                 target->lon   = newLon;
 
-                cb (target, portHandle);
+                cbTarget (target, portHandle);
 
                 if (shuttleMode && (target->range >= maxRange))
                 {
@@ -128,6 +132,22 @@ void simulation (Target *targets, SimulationParams& params, TargetOutCb cb)
 
         Sleep (1000);
     }
+}
+
+void sendOutRadarCursor (const double brg, const double rng, HANDLE portHandle)
+{
+    char   body [100];
+    char   buffer [100];
+    DWORD  bytesWritten;
+
+    sprintf (body, "$ECRSD,,,,,,,,,%.3f,%05.1f,,K,N*%%02X\r\n", rng * 0.001, brg);
+
+    sprintf (buffer, body, calcCRC (body));
+
+    if (portHandle == CONSOLE_PORT)
+        printf (buffer);
+    else
+        WriteFile (portHandle, buffer, strlen (buffer), & bytesWritten, 0);
 }
 
 void sendOutArpaTarget (const Target *target, HANDLE portHandle)
@@ -456,9 +476,9 @@ int main (int argCount, char *args [])
     simParams.sendRadarCursor = sendRadarCursor;
 
     if (mode == SimMode::Arpa)
-        simulation (targets, simParams, sendOutArpaTarget);
+        simulation (targets, simParams, sendOutArpaTarget, sendOutRadarCursor);
     else
-        simulation (targets, simParams, sendOutAisTarget);
+        simulation (targets, simParams, sendOutAisTarget, sendOutRadarCursor);
 
     if (portHandle != CONSOLE_PORT && portHandle != INVALID_HANDLE_VALUE)
         CloseHandle (portHandle);
