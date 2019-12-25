@@ -18,7 +18,7 @@
 #define CONSOLE_PORT    0
 
 typedef void (*TargetOutCb) (const Target *, HANDLE);
-typedef void (*RadarCursorCb) (const double bearing, const double range, HANDLE);
+typedef void (*RadarCursorCb) (const double bearing, const double range, const char displayRotation, HANDLE);
 
 struct SimulationParams
 {
@@ -26,6 +26,7 @@ struct SimulationParams
     double shipLat, shipLon, maxRange, radarCursorRng, radarCursorBrg;
     HANDLE portHandle;
     bool   shuttleMode, sendRadarCursor;
+    char   displayRotation;
 };
 
 unsigned char calcCRC (char *sentence)
@@ -86,10 +87,11 @@ void simulation (Target *targets, SimulationParams& params, TargetOutCb cbTarget
     const double shipLon        = params.shipLon;
     HANDLE portHandle           = params.portHandle;
     const bool shuttleMode      = params.shuttleMode;
-    const bool sendRadarCursor  = params.shuttleMode;
+    const bool sendRadarCursor  = params.sendRadarCursor;
     const double maxRange       = params.maxRange;
     const double radarCursorBrg = params.radarCursorBrg;
     const double radarCursorRng = params.radarCursorRng;
+    const char displayRotation  = params.displayRotation;
     time_t lastCalcTime         = time (0);
 
     while (true)
@@ -100,7 +102,7 @@ void simulation (Target *targets, SimulationParams& params, TargetOutCb cbTarget
         if (timeSinceLastCalc > 0)
         {
             if (sendRadarCursor)
-                cbRadarCursor (radarCursorBrg, radarCursorRng, portHandle);
+                cbRadarCursor (radarCursorBrg, radarCursorRng, displayRotation, portHandle);
 
             for (int i = 0; i < numOfTargets; ++ i)
             {
@@ -134,13 +136,13 @@ void simulation (Target *targets, SimulationParams& params, TargetOutCb cbTarget
     }
 }
 
-void sendOutRadarCursor (const double brg, const double rng, HANDLE portHandle)
+void sendOutRadarCursor (const double brg, const double rng, const char displayRotation, HANDLE portHandle)
 {
     char   body [100];
     char   buffer [100];
     DWORD  bytesWritten;
 
-    sprintf (body, "$ECRSD,,,,,,,,,%.3f,%05.1f,,K,N*%%02X\r\n", rng * 0.001, brg);
+    sprintf (body, "$ECRSD,,,,,,,,,%.3f,%05.1f,,K,%C*%%02X\r\n", rng * 0.001, brg, displayRotation);
 
     sprintf (buffer, body, calcCRC (body));
 
@@ -315,7 +317,26 @@ void showHelp ()
             "\t-a:serialParams\n"
             "\t-r:maxRange\n"
             "\t-s:maxSpeed\n"
+            "\t-u[uttleMode]\n"
+            "\t-d[c|h|n]\t send radar cursor; display rotation is course-up/heading-up/north-up\n"
             "\t-m:a | -m:r - mode (ais or radar)\n");
+}
+
+const char *getDisplayRotationName (const char displayRotation)
+{
+    const char *result;
+
+    switch (displayRotation)
+    {
+        case 'H':
+            result = "Heading up"; break;
+        case 'C':
+            result = "Course up"; break;
+        default:
+            result = "North up";
+    }
+
+    return result;
 }
 
 int main (int argCount, char *args [])
@@ -331,6 +352,7 @@ int main (int argCount, char *args [])
     int     countryCode     = 219; // Denmark
     int     radarCursorBrg  = 45;
     int     radarCursorRng  = 200;
+    char    displayRotation = 'N'; // North up
     bool    consoleMode     = true;
     bool    shuttleMode     = false;
     bool    sendRadarCursor = false;
@@ -358,6 +380,7 @@ int main (int argCount, char *args [])
     cfg.sendRadarCursor = & sendRadarCursor;
     cfg.radarCursorBrg  = & radarCursorBrg;
     cfg.radarCursorRng  = & radarCursorRng;
+    cfg.displayRotation = & displayRotation;
 
     srand  (time (0));
 
@@ -380,6 +403,28 @@ int main (int argCount, char *args [])
 
             case 'U':
                 shuttleMode = true; continue;
+
+            case 'D':
+                sendRadarCursor = true;
+
+                if (arg [2] == ':')
+                {
+                    char dispRotationChar = toupper (arg [3]);
+
+                    switch (dispRotationChar)
+                    {
+                        case 'N':
+                        case 'H':
+                        case 'C':
+                            displayRotation = dispRotationChar; continue;
+                    }
+                }
+                else
+                {
+                    displayRotation = 'N';
+                }
+                
+                continue;
         }
 
         if (arg [2] == ':')
@@ -387,39 +432,60 @@ int main (int argCount, char *args [])
             switch (toupper (arg [1]))
             {
                 case 'G':
+                {
                     loadConfig (arg + 3, cfg); break;
+                }
 
                 case 'Y':
+                {
                     countryCode = atoi (arg + 3); break;
+                }
 
                 case 'F':
+                {
                     numOfSAR = atoi (arg + 3); break;
+                }
 
                 case 'O':
+                {
                     numOfMOB = atoi (arg + 3); break;
+                }
 
                 case 'P':
+                {
                     consoleMode = false;
                     port        = atoi (arg + 3);
                     
                     break;
+                }
 
                 case 'B':
+                {
                     baud = atoi (arg + 3); break;
+                }
 
                 case 'A':
+                {
                     memcpy (params, arg + 3, 3); break;
+                }
 
                 case 'N':
+                {
                     numOfTargets = atoi (arg + 3); break;
+                }
 
                 case 'R':
+                {
                     maxRange = atoi (arg + 3); break;
+                }
 
                 case 'S':
+                {
                     maxSpeed = atoi (arg + 3); break;
+                }
 
                 case 'M':
+                {
                     switch (toupper (arg [3]))
                     {
                         case 'R':
@@ -430,6 +496,7 @@ int main (int argCount, char *args [])
                     }
 
                     break;
+                }
             }
         }
     }
@@ -453,9 +520,9 @@ int main (int argCount, char *args [])
     printf ("\n\nSetting:\n\n\tNumber of targets:\t%d\n\tNumber of SARs:\t%d\n\tNumber of MOBs:\t%d\n\tMaximal range, m:\t%d\n"
             "\tLatitude:\t\t%.6f\n\tLongitude:\t\t%.6f\n"
             "\tPort:\t\t\tCOM%d\n\tBaud:\t\t\t%d\n\tParams:\t\t\t%s\n\tConsole:\t\t%s\n\tShuttle mode:\t\t%s\n"
-            "\tSend RCur:\t\t%s\n",
+            "\tSend RCur:\t\t%s (%s)\n",
             numOfTargets, numOfSAR, numOfMOB, maxRange, lat, lon, port, baud, params, consoleMode ? "yes" : "no",
-            shuttleMode ? "yes" : "no", sendRadarCursor ? "yes" : "no");
+            shuttleMode ? "yes" : "no", sendRadarCursor ? "yes" : "no", getDisplayRotationName (displayRotation));
 
 
     if (sendRadarCursor)
@@ -474,6 +541,7 @@ int main (int argCount, char *args [])
     simParams.radarCursorBrg  = radarCursorBrg;
     simParams.radarCursorRng  = radarCursorRng;
     simParams.sendRadarCursor = sendRadarCursor;
+    simParams.displayRotation = displayRotation;
 
     if (mode == SimMode::Arpa)
         simulation (targets, simParams, sendOutArpaTarget, sendOutRadarCursor);

@@ -10,7 +10,7 @@ struct Config
     int     *numOfTargets, *numOfSAR, *numOfMOB, *maxRange, *maxSpeed, *port, *baud, *countryCode, *radarCursorBrg, *radarCursorRng;
     SimMode *simMode;
     bool    *consoleMode, *shuttleMode, *sendRadarCursor;
-    char    *params;
+    char    *params, *displayRotation;
 };
 
 bool atob (const char *value)
@@ -96,6 +96,8 @@ void processLine (const char *line, Config& cfg)
             memcpy (cfg.params, value, sizeof (cfg.params));
         else if (stricmp (key, "sendRadarCursor") == 0)
             *(cfg.sendRadarCursor) = atob (value);
+        else if (stricmp (key, "displayRotation") == 0)
+            *(cfg.displayRotation) = toupper (*value);
         else if (stricmp (key, "radarCursorBrg") == 0)
             *(cfg.radarCursorBrg) = atoi (value);
         else if (stricmp (key, "radarCursorRng") == 0)
